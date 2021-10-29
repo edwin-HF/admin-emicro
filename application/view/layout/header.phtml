@@ -1,0 +1,126 @@
+<div class="layui-logo layuimini-logo">
+    Admin
+</div>
+
+<div class="layuimini-header-content">
+    <a>
+        <div class="layuimini-tool slide-expand-tool" data-expanded="1"><i title="展开" class="fa fa-outdent"></i></div>
+    </a>
+
+    <!--电脑端头部菜单-->
+    <ul class="layui-nav layui-layout-left layuimini-header-menu layuimini-menu-header-pc layuimini-pc-show">
+
+        <?php foreach ($menu??[] as $item){?>
+            <li data-code="<?php echo $item['header']['code']; ?>" data-menu='<?php echo json_encode($item['slide'] ?? []); ?>'  class="layui-nav-item menu-li " id="">
+<!--                <a href="javascript:;">-->
+<!--                    <span class="layui-left-nav">--><?php //echo $item['header']['title']; ?><!--</span>-->
+<!--                </a>-->
+            </li>
+        <?php }?>
+    </ul>
+
+    <ul class="layui-nav layui-layout-right" style="padding-right: 20px !important;">
+        <li class="layui-nav-item mobile layui-hide-xs" lay-unselect>
+            <a href="javascript:;" data-check-screen="full"><i class="fa fa-arrows-alt"></i></a>
+        </li>
+        <li class="layui-nav-item layuimini-setting" style="min-width: 82px">
+            <a href="javascript:;"> <?= $session['username'] ?? ''?> </a>
+            <dl class="layui-nav-child">
+                <dd>
+                    <a href="javascript:;" data-title="修改密码" class="change-password" data-icon="fa fa-gears">修改密码</a>
+                </dd>
+                <dd>
+                    <hr>
+                </dd>
+                <dd>
+                    <a href="javascript:;" class="login-out">退出登录</a>
+                </dd>
+            </dl>
+        </li>
+    </ul>
+</div>
+
+<div class="change-password-template" style="display: none">
+    <div class="capture-detail layui-form" style="padding: 10px 70px;">
+
+        <div class="layui-form-item">
+            <label class="layui-form-label">旧密码</label>
+            <div class="layui-input-block">
+                <input type="password" placeholder="请输旧密码" class="layui-input old-password" value="">
+            </div>
+        </div>
+
+        <div class="layui-form-item">
+            <label class="layui-form-label">新密码</label>
+            <div class="layui-input-block">
+                <input type="password" placeholder="请输入新密码" class="layui-input new-password" value="">
+            </div>
+        </div>
+
+    </div>
+</div>
+<script src="/assert/admin/lib/jquery-3.4.1/jquery-3.4.1.min.js" charset="utf-8"></script>
+
+<script>
+
+    $('.change-password').click(function () {
+        let $layer_content;
+        layer.open({
+            type: 1,
+            area: ['640px', '240px'], //宽高
+            title:'修改密码',
+            content: $('.change-password-template').html(),
+            btn:['确定','取消'],
+            success: function(layero){
+
+                $layer_content = $('.layui-layer-content');
+                layero.find('.layui-layer-btn').css('text-align', 'center');
+                layero.find('.layui-form-label').css('width', '100px');
+                layero.find('.layui-input-block').css('margin-left', '140px');
+
+            },
+            btn1:function () {
+
+                let old_password = $layer_content.find('.old-password').val();
+                let new_password = $layer_content.find('.new-password').val();
+
+                if (old_password.length == 0 || new_password.length == 0){
+                    layer.msg('请完整填写');
+                    return;
+                }
+
+                let formData = new FormData();
+
+                formData.append("old_password", old_password);
+                formData.append("new_password", new_password);
+
+                $.ajax({
+                    type: "POST",
+                    url: "/changePassword",
+                    async: true,
+                    data: formData,
+                    processData: false,
+                    contentType: false,
+                    success: function (data) {
+                        if (data.code == 1000){
+                            layer.msg('操作成功');
+                            location.reload();
+                        }else {
+                            layer.msg(data.info);
+                        }
+                    },
+                    error: function (error) {
+
+                    },
+                });
+
+            },
+        });
+    });
+
+    $('.login-out').click(function () {
+        location.href = '/logout';
+    });
+
+</script>
+

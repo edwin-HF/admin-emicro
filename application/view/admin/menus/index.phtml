@@ -1,0 +1,225 @@
+<div class="content-wrapper" >
+    <!-- Main content -->
+    <section class="content">
+        <div class="box box-success"  style="overflow: auto;">
+
+            <?php if (\util\Permission::allow('system:menus:add')){ ?>
+                <div class="layui-btn-group" style="margin: 10px !important;">
+                    <a href="javascript:;" type="button" class="layui-btn layui-btn-normal layui-btn-sm btn-add">新增</a>
+                </div>
+            <?php }?>
+
+            <div class="box-body no-padding" id="menu-list"></div>
+
+        </div>
+    </section>
+</div>
+
+<div class="add-menu-template" style="display: none">
+
+    <div class="section-box layui-form">
+        <div class="layui-form-item">
+            <label class="layui-form-label">菜单名称</label>
+            <div class="layui-input-block">
+                <input type="text"  placeholder="请输入菜单名称" class="layui-input title">
+            </div>
+        </div>
+
+        <div class="layui-form-item">
+            <label class="layui-form-label">icon</label>
+            <div class="layui-input-block">
+                <input type="text"  placeholder="请输入icon" class="layui-input icon">
+            </div>
+        </div>
+
+        <div class="layui-form-item">
+            <label class="layui-form-label">菜单标识</label>
+            <div class="layui-input-block">
+                <input type="text"  placeholder="请输入菜单标识" class="layui-input unique">
+            </div>
+        </div>
+
+        <div class="layui-form-item">
+            <label class="layui-form-label">菜单Url</label>
+            <div class="layui-input-block">
+                <input type="text"  placeholder="请输入菜单Url" class="layui-input url">
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script src="/assert/admin/js/sort-inline.js"></script>
+<script type="text/javascript">
+
+    $(function () {
+
+        layui.use(['form','layer','form','treeTable'], function() {
+            let form  = layui.form;
+            let layer = layui.layer;
+            let treeTable = layui.treeTable;
+
+            $.get('/system/menus/render',function (data) {
+
+                treeTable.render({
+                    container : $('#menu-list'),
+                    primary : {
+                        header : {title:'菜单名称',style:''},
+                        field  : 'title'
+                    },
+                    extra : {
+                        headers : [
+                            {title:'icon',style:'width: 4px;text-align: center'},
+                            {title:'菜单标识'},
+                            {title:'菜单Url'},
+                            {title:'排序',style: 'text-align: center;width: 130px'},
+                            {title:'操作',style: 'text-align: center;width: 140px'},
+                        ],
+                        columns : function (item) {
+                            let html = '<td style="text-align: center;"><i class="fa '+item.icon+'"></i></td>' +
+                                '<td>'+item.unique+'</td>' +
+                                '<td>'+item.path+'</td>' +
+                                '<td style="width: 130px;text-align: center">' +
+                                '<div class="inline-edit">\n' +
+                                '<div class="layui-inline">\n' +
+                                '<div class="layui-input-inline" style="margin-left: 0">\n' +
+                                '<input type="text" class="layui-input inline-input-left sort" data-url="/system/menus/sort" data-id="'+item.id+'" value="'+(item.sort )+'">\n' +
+                                '</div>\n' +
+                                '</div>\n' +
+                                '<button type="button" class="layui-btn layui-btn-primary layui-btn-sm inline-bth-right inline-edit-btn">\n' +
+                                '<i class="layui-icon">&#xe605;</i>\n' +
+                                '</button>\n' +
+                                '</div>' +
+                                '</td>' +
+                                '<td style="width: 140px;text-align: center">' +
+                                '<div class="layui-btn-group">\n';
+                                if (permission.allow('system:menus:add')){
+                                    html += '  <button type="button" class="layui-btn layui-btn-primary layui-btn-xs btn-add">增加</button>\n';
+                                }
+
+                                if (permission.allow('system:menus:edit')){
+                                    html += '  <button type="button" class="layui-btn layui-btn-primary layui-btn-xs btn-edit">编辑</button>\n';
+                                }
+
+                                if (permission.allow('system:menus:delete')){
+                                    html += '  <button type="button" class="layui-btn layui-btn-primary layui-btn-xs btn-delete">删除</button>\n';
+                                }
+                                html += '</div>' +
+                                        '</td>';
+
+                                return html;
+                        }
+
+                    },
+                    data : data,
+                });
+
+            })
+
+
+            $(document).on('click','.btn-add,.btn-edit',function () {
+                let $layer_content;
+                let data;
+                let parent_id = 0;
+                let $this = $(this);
+                let is_add = !$this.hasClass('btn-edit');
+
+                layer.open({
+                    type: 1,
+                    area: ['520px', '380px'], //宽高
+                    title: '菜单管理',
+                    content: $('.add-menu-template').html(),
+                    btn: ['确定', '取消'],
+                    success: function (layero) {
+                        $layer_content = layero;
+
+                        layero.find('.layui-layer-btn').css('text-align', 'center');
+                        layero.find('.layui-form-item').css('margin','12px 12px');
+
+                        data = $this.parents('tr').data('item');
+
+                        if (data){
+                            parent_id = data.id;
+
+                            if (!is_add){
+
+                                layero.find('.title').val(data.title);
+                                layero.find('.icon').val(data.icon);
+                                layero.find('.unique').val(data.unique);
+                                layero.find('.url').val(data.path);
+
+                            }
+
+                        }
+
+                        form.render();
+
+                    },
+                    btn1:function () {
+
+                        layer.load(2);
+
+                        let title  = $layer_content.find('.title').val();
+                        let icon   = $layer_content.find('.icon').val();
+                        let unique = $layer_content.find('.unique').val();
+                        let url    = $layer_content.find('.url').val();
+
+                        let data = {
+                            is_add    : is_add ? 1 : 0,
+                            parent_id : parent_id,
+                            title     : title,
+                            icon      : icon,
+                            unique    : unique,
+                            url       : url,
+                        };
+
+                        $.post('/system/menus/save',data,function (data) {
+
+                            if (data.code == 1000){
+                                layer.msg('操作成功');
+                                window.location.reload();
+                            }else{
+                                layer.msg(data.info)
+                            }
+                        })
+
+                        layer.closeAll();
+                    }
+                })
+            })
+
+            $(document).on('click','.btn-delete',function () {
+                let $this = $(this);
+                let data = $this.parents('tr').data('item');
+                layer.confirm('确认删除吗？', {
+                    btn: ['确认', '取消'] //按钮
+                }, function () {
+
+                    layer.msg('删除中...', {
+                        icon: 16
+                        , shade: 0.01
+                    });
+
+                    $.ajax({
+                        url: '/system/menu/delete',
+                        type: 'post',
+                        data:{id:data.id},
+                        success: function (data) {
+                            if (data.code == 1000) {
+                                layer.msg('操作成功');
+                            } else {
+                                layer.msg(data.info);
+                            }
+                            window.location.reload();
+                        }
+                    });
+
+                });
+                return false;
+            })
+
+        })
+
+    });
+
+</script>

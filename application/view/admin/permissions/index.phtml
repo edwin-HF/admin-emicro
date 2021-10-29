@@ -1,0 +1,217 @@
+<div class="content-wrapper" >
+    <!-- Main content -->
+    <section class="content">
+        <div class="box box-success"  style="overflow: auto;">
+
+            <?php if (\util\Permission::allow('system:permissions:add')){?>
+                <div class="layui-btn-group" style="margin: 10px !important;">
+                    <a href="javascript:;" type="button" class="layui-btn layui-btn-normal layui-btn-sm btn-add">新增</a>
+                </div>
+            <?php }?>
+
+            <div class="box-body no-padding" id="menu-list"></div>
+
+        </div>
+    </section>
+</div>
+
+<div class="add-menu-template" style="display: none">
+
+    <div class="section-box layui-form">
+        <div class="layui-form-item">
+            <label class="layui-form-label">权限名称</label>
+            <div class="layui-input-block">
+                <input type="text"  placeholder="请输入权限名称" class="layui-input title">
+            </div>
+        </div>
+
+        <div class="layui-form-item">
+            <label class="layui-form-label">权限标识</label>
+            <div class="layui-input-block">
+                <input type="text"  placeholder="请输入权限标识" class="layui-input unique">
+            </div>
+        </div>
+
+        <div class="layui-form-item">
+            <label class="layui-form-label">类型</label>
+            <div class="layui-input-block">
+                <select name="type" class="type" lay-verify="">
+                    <?php foreach (\model\AdminPermission::MAP as $key => $value){?>
+                        <option value="<?=$key?>"><?=$value?></option>
+                    <?php }?>
+                </select>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script src="/assert/admin/js/sort-inline.js"></script>
+<script type="text/javascript">
+
+    $(function () {
+
+        layui.use(['form','layer','form','treeTable'], function() {
+            let form  = layui.form;
+            let layer = layui.layer;
+            let treeTable = layui.treeTable;
+
+            $.get('/system/permissions/render',function (data) {
+
+                treeTable.render({
+                    container : $('#menu-list'),
+                    primary : {
+                        header : {title:'权限名称',style:''},
+                        field  : 'title'
+                    },
+                    extra : {
+                        headers : [
+                            {title:'权限标识'},
+                            {title:'类型'},
+                            {title:'排序',style: 'text-align: center;width: 130px'},
+                            {title:'操作',style: 'text-align: center;width: 140px'},
+                        ],
+                        columns : function (item) {
+                            let html = '<td>'+item.unique+'</td>' +
+                                '<td>'+(item.type == 1 ? '菜单' : '按钮')+'</td>' +
+                                '<td style="width: 130px;text-align: center">' +
+                                '<div class="inline-edit">\n' +
+                                '<div class="layui-inline">\n' +
+                                '<div class="layui-input-inline" style="margin-left: 0">\n' +
+                                '<input type="text" class="layui-input inline-input-left sort" data-url="/system/permissions/sort" data-id="'+item.id+'" value="'+(item.sort )+'">\n' +
+                                '</div>\n' +
+                                '</div>\n' +
+                                '<button type="button" class="layui-btn layui-btn-primary layui-btn-sm inline-bth-right inline-edit-btn">\n' +
+                                '<i class="layui-icon">&#xe605;</i>\n' +
+                                '</button>\n' +
+                                '</div>' +
+                                '</td>' +
+                                '<td style="width: 140px;text-align: center">' +
+                                '<div class="layui-btn-group">\n';
+                                if (permission.allow('system:permissions:add')){
+                                    html += '  <button type="button" class="layui-btn layui-btn-primary layui-btn-xs btn-add">增加</button>\n';
+                                }
+                                if (permission.allow('system:permissions:edit')){
+                                    html += '  <button type="button" class="layui-btn layui-btn-primary layui-btn-xs btn-edit">编辑</button>\n';
+                                }
+                                if (permission.allow('system:permissions:delete')){
+
+                                    html += '  <button type="button" class="layui-btn layui-btn-primary layui-btn-xs btn-delete">删除</button>\n';
+                                }
+
+                                html += '</div>' +
+                                        '</td>';
+
+                                return html;
+                        }
+                    },
+                    data : data,
+                });
+
+            })
+
+            $(document).on('click','.btn-add,.btn-edit',function () {
+                let $layer_content;
+                let data;
+                let parent_id = 0;
+                let $this = $(this);
+                let is_add = !$this.hasClass('btn-edit');
+
+                layer.open({
+                    type: 1,
+                    area: ['480px', '360px'], //宽高
+                    title: '权限管理',
+                    content: $('.add-menu-template').html(),
+                    btn: ['确定', '取消'],
+                    success: function (layero) {
+                        $layer_content = layero;
+
+                        layero.find('.layui-layer-btn').css('text-align', 'center');
+                        layero.find('.layui-form-item').css('margin','12px 12px');
+
+                        data = $this.parents('tr').data('item');
+
+                        if (data){
+                            parent_id = data.id;
+
+                            if (!is_add){
+
+                                layero.find('.title').val(data.title);
+                                layero.find('.unique').val(data.unique);
+                                layero.find('.type').find("option[value="+data.type+"]").attr("selected",true);
+
+                            }
+
+                        }
+
+                        form.render();
+
+                    },
+                    btn1:function () {
+
+                        layer.load(2);
+
+                        let title  = $layer_content.find('.title').val();
+                        let unique = $layer_content.find('.unique').val();
+                        let type   = $layer_content.find('.type').val();
+
+                        let data = {
+                            is_add    : is_add ? 1 : 0,
+                            parent_id : parent_id,
+                            title     : title,
+                            unique    : unique,
+                            type      : type,
+                        };
+
+                        $.post('/system/permission/save',data,function (data) {
+
+                            if (data.code == 1000){
+                                layer.msg('操作成功');
+                                window.location.reload();
+                            }else{
+                                layer.msg(data.info)
+                            }
+                        })
+
+                        layer.closeAll();
+                    }
+                })
+            })
+
+            $(document).on('click','.btn-delete',function () {
+                let $this = $(this);
+                let data = $this.parents('tr').data('item');
+                console.log(data)
+                layer.confirm('确认删除吗？', {
+                    btn: ['确认', '取消'] //按钮
+                }, function () {
+
+                    layer.msg('删除中...', {
+                        icon: 16
+                        , shade: 0.01
+                    });
+
+                    $.ajax({
+                        url: '/system/permission/delete',
+                        type: 'post',
+                        data:{id:data.id},
+                        success: function (data) {
+                            if (data.code == 1000) {
+                                layer.msg('操作成功');
+                            } else {
+                                layer.msg(data.info);
+                            }
+                            window.location.reload();
+                        }
+                    });
+
+                });
+                return false;
+            })
+
+        })
+
+    });
+
+
+</script>

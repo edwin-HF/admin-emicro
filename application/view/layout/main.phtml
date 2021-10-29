@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Admin</title>
+    <meta name="renderer" content="webkit">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="format-detection" content="telephone=no">
+    <link rel="stylesheet" href="/assert/admin/lib/layui-v2.6.3/css/layui.css" media="all">
+    <link rel="stylesheet" href="/assert/admin/css/layuimini.css?v=2.0.4.2" media="all">
+    <link rel="stylesheet" href="/assert/admin/css/themes/default.css" media="all">
+    <link rel="stylesheet" href="/assert/admin/lib/font-awesome-4.7.0/css/font-awesome.min.css" media="all">
+    <link rel="stylesheet" href="/assert/admin/css/common.css" media="all">
+    <style id="layuimini-bg-color">
+    </style>
+</head>
+<body class="layui-layout-body layuimini-all">
+<div class="layui-layout layui-layout-admin">
+
+    <div class="layui-header header">
+        <?php require 'header.phtml'?>
+    </div>
+
+    <!--无限极左侧菜单-->
+    <div class="layui-side layui-bg-black layuimini-menu-left">
+        <?php require 'slide.phtml'?>
+    </div>
+
+    <div class="layui-body" style="overflow: auto;border-top: 1px solid darkgray;">
+        <?php echo $content ??''; ?>
+    </div>
+</div>
+
+<script src="/assert/admin/js/helper.js" charset="utf-8"></script>
+<script src="/assert/admin/js/permission.js" charset="utf-8"></script>
+<script src="/assert/admin/lib/layui-v2.6.3/layui.js" charset="utf-8"></script>
+<script src="/assert/admin/js/lay-config.js?v=2.0.0" charset="utf-8"></script>
+<script>
+    layui.use(['jquery', 'layer', 'miniMenu','miniAdmin','miniTab','form','element'], function () {
+
+        let $ = layui.jquery,
+            form = layui.form,
+            element = layui.element,
+            miniAdmin = layui.miniAdmin,
+            miniMenu = layui.miniMenu,
+            miniTab = layui.miniTab,
+            laypage = layui.laypage;
+            miniAdmin.listen();
+            miniMenu.render();
+            miniTab.listen();
+            let uri = window.location.pathname;
+
+            $.ajax({
+                type: "post",
+                url: "/menus",
+                cache:false,
+                async:false,
+                success: function(data){
+
+                    layer.load(2);
+
+                    renderMenu(function (str_menu) {
+                        $('.slide-menu').html(str_menu);
+                        element.init();
+                    },function () {
+                        return data;
+                    });
+
+                    let choice = false;
+                    let choice_level= 1;
+                    parseTree(function (item, level) {
+
+                        if (item.path == uri){
+                            choiceMenu(menuSelector(item.id));
+                            choice_level = level;
+                            choice = true;
+                        }
+
+                        if (level >= 1 && choice && level != choice_level){
+                            choiceMenu(menuSelector(item.id));
+                        }
+
+                        if (level == 1 && choice){
+                            choice = false;
+                        }
+
+                    },data,'desc');
+
+                    element.init();
+                    form.render();
+
+                    layer.closeAll();
+
+                }
+            });
+
+            laypage.render({
+                elem: 'page-container'
+                ,theme:'#1E9FFF'
+                ,limit: <?= \EMicro\Request::input('limit',10)?>
+                ,curr: <?= \EMicro\Request::input('page',1)?>
+                ,count: <?= $count ?? 0 ?> //数据总数，从服务端得到
+                ,jump: function(obj, first){
+                //obj包含了当前分页的所有参数，比如：
+                console.log(obj.curr); //得到当前页，以便向服务端请求对应页的数据。
+                console.log(obj.limit); //得到每页显示的条数
+
+                if(!first){
+                    let query = window.location.search.substring(1);
+                    let params = '';
+                    let vars = query.split("&");
+                    for (let i=0;i<vars.length;i++) {
+                        let pair = vars[i].split("=");
+
+                        if(pair[0] == 'page' || pair[0] == 'limit'){
+                            continue;
+                        }
+
+                        params += '&' + vars[i];
+                    }
+
+                    location.href = '?page=' + obj.curr + '&limit=' + obj.limit + params;
+                }
+            }
+
+
+        });
+
+        $('.search').click(function () {
+            $('.table-search-fieldset').slideToggle();
+        });
+
+        $('.btn-back').click(function () {
+            window.history.back();
+        });
+
+    });
+
+</script>
+</body>
+</html>

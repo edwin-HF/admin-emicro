@@ -1,0 +1,27 @@
+.tree-expand-icon-box{
+    height: 12px;
+    line-height: 12px;
+    width: 12px;
+    text-align: center;
+    border: 1px solid #c0c4cc;
+    display: inline-block;
+    cursor: pointer;
+}
+.tree-expand-icon-box i{
+    font-size: 12px;
+}
+.tree-child{
+    margin-left: 30px;
+    margin-top: 10px;
+}
+.tree-entry{
+    display: inline-block;
+}
+.tree-node-icon-box{
+    display: inline-block;
+    width: 14px;
+}
+.tree-entry-block{
+    display: block;
+    margin: 6px 0;
+}

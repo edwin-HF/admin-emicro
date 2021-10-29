@@ -1,0 +1,28 @@
+.form-box-2{
+    display: inline-block;
+}
+.batch-operate{
+    padding: 5px;
+    margin-left: 4px;
+}
+.layui-table[lay-skin=line] td{
+    border-width: 1px 1px !important;
+}
+.table-toggle .layui-icon-triangle-d:before {
+    content: "\e623";
+}
+
+.table-toggle.open .layui-icon-triangle-d:before {
+    content: "\e625";
+    background-color: transparent;
+}
+.slide-action{
+    margin-right: 4px;
+}
+.slide-action-td{
+    cursor: pointer;
+}
+.empty{
+    width: 25px;
+    display: inline-block;
+}

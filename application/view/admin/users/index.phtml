@@ -1,0 +1,241 @@
+<style>
+    .layui-form-label{
+        width: auto !important;
+    }
+</style>
+<div class="layuimini-container">
+    <div class="layuimini-main">
+
+        <div class="layui-btn-group" style="margin: 10px !important;">
+            <button type="button" class="layui-btn layui-btn-normal layui-btn-sm search">筛选</button>
+            <?php if (\util\Permission::allow('system:users:add')){?>
+                <button type="button" class="layui-btn layui-btn-normal layui-btn-sm btn-add">增加</button>
+            <?php }?>
+        </div>
+
+        <fieldset class="table-search-fieldset" style="display: none">
+            <legend>搜索信息</legend>
+            <div style="margin: 10px 10px 10px 10px">
+                <form class="layui-form layui-form-pane" action="">
+                    <div class="layui-form-item">
+
+                        <div class="layui-inline">
+                            <div class="layui-input-inline">
+                                <input type="text" name="username" placeholder="用户名" class="layui-input" value="<?=\EMicro\Request::input('username','')?>">
+                            </div>
+                        </div>
+
+                        <div class="layui-inline">
+                            <button type="submit" class="layui-btn layui-btn-primary"  lay-submit lay-filter="data-search-btn"><i class="layui-icon"></i> 搜 索</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </fieldset>
+
+        <table class="layui-table layui-form">
+            <thead>
+            <tr>
+                <th>ID</th>
+                <th>用户名</th>
+                <th>角色</th>
+                <th>状态</th>
+                <th>创建时间</th>
+                <th style="text-align: center">操作</th>
+            </tr>
+            </thead>
+            <tbody>
+            <?php foreach ($list??[] as $item){ ?>
+            <tr>
+                <td><?=$item['id']??''?></td>
+                <td><?=$item['username']??''?></td>
+                <td>
+                    <?php foreach ($roleGroup[$item['id']] ?? [] as $role){?>
+                        <span class="layui-badge layui-bg-blue"><?=$role['name']?></span>
+                    <?php }?>
+                </td>
+                <td>
+                    <input type="checkbox" class="btn-status" data-status="<?=$item['status']?>" <?=$item['status'] == \model\AdminUser::STATUS_NORMAL ? 'checked' : ''?> lay-skin="switch" lay-text="正常|冻结">
+                </td>
+                <td><?=date('Y-m-d H:i:s',strtotime($item['created_at']))??''?></td>
+                <td style="text-align: center">
+                    <div class="layui-btn-group">
+                        <?php if (\util\Permission::allow('system:users:edit')){?>
+                            <button type="button" class="layui-btn layui-btn-primary layui-btn-xs btn-edit" data-item='<?=json_encode($item)?>' data-roles='<?=json_encode($roleGroup[$item['id']]??[])?>'>编辑</button>
+                        <?php }?>
+                        <?php if (\util\Permission::allow('system:users:delete')){?>
+                            <button type="button" class="layui-btn layui-btn-primary layui-btn-xs btn-delete" data-item='<?=json_encode($item)?>'>删除</button>
+                        <?php }?>
+                    </div>
+                </td>
+
+            </tr>
+            <?php } ?>
+            </tbody>
+        </table>
+
+        <div id="page-container"></div>
+
+    </div>
+</div>
+
+<div class="add-template" style="display: none">
+    <div class="capture-detail layui-form" style="padding: 10px 70px;">
+
+        <div class="layui-form-item">
+            <label class="layui-form-label">用户名</label>
+            <div class="layui-input-block">
+                <input type="text" placeholder="请输入用户名" class="layui-input username" value="">
+            </div>
+        </div>
+
+        <div class="layui-form-item">
+            <label class="layui-form-label">密码</label>
+            <div class="layui-input-block">
+                <input type="password" placeholder="请输入密码" class="layui-input password" value="">
+            </div>
+        </div>
+
+        <div class="layui-form-item">
+            <label class="layui-form-label">状态</label>
+            <div class="layui-input-block">
+                <input type="checkbox" class="status" lay-skin="switch" lay-text="启用|冻结">
+            </div>
+        </div>
+
+        <div class="layui-form-item">
+            <label class="layui-form-label">角色</label>
+            <div class="layui-input-block">
+                <?php foreach ($roles??[] as $role){?>
+                    <input type="checkbox" class="role" name="role" data-id="<?= $role['id']?>" value="<?=$role['id']?>" title="<?=$role['name']?>" lay-skin="primary">
+                <?php }?>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script type="text/javascript">
+    $(function () {
+
+        layui.use(['form'], function () {
+            let form = layui.form;
+
+            $('.btn-add,.btn-edit').click(function () {
+
+                let $layer_content;
+                let $this = $(this);
+                let edit_id = 0;
+
+                layer.open({
+                    type: 1,
+                    area: ['680px', '480px'], //宽高
+                    title:'管理员',
+                    content: $('.add-template').html(),
+                    btn:['确定','取消'],
+                    success: function(layero){
+
+                        $layer_content = $('.layui-layer-content');
+                        layero.find('.layui-layer-btn').css('text-align', 'center');
+
+                        let data = $this.data('item');
+
+                        if (data){
+                            edit_id = data.id;
+                            $layer_content.find('.username').val(data.username);
+                            if (data.status == 1){
+                                $layer_content.find('.status').attr('checked',true);
+                            }
+
+                            let roles = $this.data('roles');
+
+                            $.each(roles,function (index,item) {
+                                $layer_content.find('.role[value='+item.role_id+']').attr('checked',true);
+                            })
+                        }
+
+                        form.render();
+
+                    },
+                    btn1:function () {
+
+                        let username = $layer_content.find('.username').val();
+                        let password = $layer_content.find('.password').val();
+                        let status   = $layer_content.find('.status').is(':checked') ? 1 : 2;
+                        let roles    = [];
+
+                        $.each($layer_content.find('.role:checked'),function () {
+                            roles.push($(this).val());
+                        })
+
+                        if ( username.length == 0 || roles.length == 0){
+                            layer.msg('请完整填写');
+                            return;
+                        }
+
+                        let formData = new FormData();
+
+                        formData.append("id", edit_id);
+                        formData.append("username", username);
+                        formData.append("password", password);
+                        formData.append("status", status);
+                        formData.append("roles", roles);
+
+                        $.ajax({
+                            type: "POST",
+                            url: "/system/user/save",
+                            async: true,
+                            data: formData,
+                            processData: false,
+                            contentType: false,
+                            success: function (data) {
+                                if (data.code == 1000){
+                                    layer.msg('操作成功');
+                                    window.location.reload();
+                                }else {
+                                    layer.msg(data.info);
+                                }
+                            },
+                            error: function (error) {
+
+                            },
+                        });
+
+                        layer.closeAll();
+
+                    },
+                });
+
+            });
+
+            $('.btn-delete').click(function () {
+                let $this = $(this);
+                layer.confirm('确认删除吗？', {
+                    btn: ['确认','取消'] //按钮
+                }, function(){
+
+                    let id = $this.data('item').id;
+
+                    $.ajax({
+                        url  : '/system/user/delete',
+                        data : { id:id},
+                        method : 'post',
+                        success:function (data) {
+                            if (data.code == 1000){
+                                layer.msg('操作成功');
+                                window.location.reload();
+                            }else {
+                                layer.msg(data.msg);
+                            }
+                        }
+                    });
+
+                    layer.closeAll();
+                });
+                return false;
+            });
+
+
+        });
+    })
+</script>

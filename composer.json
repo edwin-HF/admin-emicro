@@ -1,0 +1,6 @@
+{
+    "require": {
+        "illuminate/database": "^8.65",
+        "ext-json": "*"
+    }
+}

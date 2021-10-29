@@ -1,0 +1,288 @@
+<style>
+    .tr th,td{
+        text-align: center !important;
+    }
+</style>
+<div class="layuimini-container">
+    <div class="layuimini-main">
+
+        <div class="layui-btn-group" style="margin: 10px !important;">
+            <button type="button" class="layui-btn layui-btn-normal layui-btn-sm search">筛选</button>
+            <?php if(\util\Permission::allow('system:roles:add')){ ?>
+                <button type="button" class="layui-btn layui-btn-normal layui-btn-sm btn-add">增加</button>
+            <?php }?>
+        </div>
+
+        <fieldset class="table-search-fieldset" style="display: none">
+            <legend>搜索信息</legend>
+            <div style="margin: 10px 10px 10px 10px">
+                <form class="layui-form layui-form-pane" action="">
+                    <div class="layui-form-item">
+
+                        <div class="layui-inline">
+                            <div class="layui-input-inline">
+                                <input type="text" name="name" placeholder="角色名称" class="layui-input" value="<?=\EMicro\Request::input('name','')?>">
+                            </div>
+                        </div>
+
+                        <div class="layui-inline">
+                            <button type="submit" class="layui-btn layui-btn-primary"  lay-submit lay-filter="data-search-btn"><i class="layui-icon"></i> 搜 索</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </fieldset>
+
+        <table class="layui-table layui-form">
+            <thead>
+            <tr>
+                <th style="text-align: center">角色名称</th>
+                <th style="text-align: center">创建时间</th>
+                <th style="width: 140px;text-align: center">操作</th>
+            </tr>
+            </thead>
+            <tbody>
+            <?php foreach ($list??[] as $item){ ?>
+                <tr>
+                    <td><?=$item['name']??''?></td>
+                    <td><?=date('Y-m-d H:i:s',strtotime($item['created_at']))??''?></td>
+                    <td>
+                        <?php if(!\util\Permission::isRoot($item['id'])){ ?>
+                            <div class="layui-btn-group">
+                                <?php if (\util\Permission::allow('system:roles:permission')){ ?>
+                                    <button type="button" class="layui-btn layui-btn-primary layui-btn-xs btn-permission" data-item='<?=json_encode($item)?>'>设置权限</button>
+                                <?php }?>
+                                <?php if (\util\Permission::allow('system:roles:edit')){ ?>
+                                    <button type="button" class="layui-btn layui-btn-primary layui-btn-xs btn-edit" data-item='<?=json_encode($item)?>'>编辑</button>
+                                <?php }?>
+                                <?php if (\util\Permission::allow('system:roles:delete')){ ?>
+                                    <button type="button" class="layui-btn layui-btn-primary layui-btn-xs btn-delete" data-item='<?=json_encode($item)?>'>删除</button>
+                                <?php }?>
+                            </div>
+                        <?php }else{echo '----';} ?>
+                    </td>
+
+                </tr>
+            <?php } ?>
+            </tbody>
+        </table>
+
+        <div id="page-container"></div>
+
+    </div>
+</div>
+
+<div class="add-template" style="display: none">
+    <div class="capture-detail layui-form" style="padding: 10px 70px;">
+
+        <div class="layui-form-item">
+            <label class="layui-form-label">角色名称</label>
+            <div class="layui-input-block">
+                <input type="text" placeholder="请输入角色名称" class="layui-input name" value="">
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<div class="permission-template" style="display: none">
+    <div class="capture-detail layui-form" style="padding: 10px 70px;">
+        <div class="tree-box"></div>
+    </div>
+</div>
+
+<script type="text/javascript">
+    $(function () {
+
+        layui.use(['form','treeCheckbox'], function () {
+            let form = layui.form;
+            let treeCheckbox = layui.treeCheckbox;
+
+            $('.btn-permission').click(function () {
+
+                let $layer_content;
+                let $this = $(this);
+                let role_id = 0;
+                let treeHandle;
+
+                let permission = layer.open({
+                    type: 1,
+                    title:'权限设置',
+                    content: $('.permission-template').html(),
+                    btn:['确定','取消'],
+                    success: function(layero){
+
+                        $layer_content = $('.layui-layer-content');
+                        layero.find('.layui-layer-btn').css('text-align', 'center');
+
+                        let data = $this.data('item');
+
+                        if (data){
+
+                            role_id = data.id;
+
+                            let load = layer.load(2);
+
+                            $.ajax({
+                                type: "GET",
+                                url: "/system/role/permissions",
+                                async: false,
+                                data: {id:role_id},
+                                success: function (tree) {
+                                    treeHandle = treeCheckbox.render({
+                                        container:layero.find('.tree-box'),
+                                        data:tree
+                                    });
+
+                                    layer.close(load);
+                                },
+                                error: function (error) {
+
+                                },
+                            });
+                        }
+
+                    },
+                    btn1:function () {
+
+                        let permission = treeHandle.checkedId();
+
+                        if (permission.length == 0 ){
+                            layer.msg('请选择权限');
+                            return;
+                        }
+
+                        let formData = new FormData();
+
+                        formData.append("id", role_id);
+                        formData.append("permission", permission);
+
+                        $.ajax({
+                            type: "POST",
+                            url: "/system/role/permission/save",
+                            async: true,
+                            data: formData,
+                            processData: false,
+                            contentType: false,
+                            success: function (data) {
+                                if (data.code == 1000){
+                                    layer.msg('操作成功');
+                                    window.location.reload();
+                                }else {
+                                    layer.msg(data.info);
+                                }
+                            },
+                            error: function (error) {
+
+                            },
+                        });
+
+                    },
+                });
+
+                layer.full(permission);
+
+            });
+
+            $('.btn-add,.btn-edit').click(function () {
+
+                let $layer_content;
+                let $this = $(this);
+                let edit_id = 0;
+
+                layer.open({
+                    type: 1,
+                    area: ['480px', '200px'], //宽高
+                    title:'角色管理',
+                    content: $('.add-template').html(),
+                    btn:['确定','取消'],
+                    success: function(layero){
+
+                        $layer_content = $('.layui-layer-content');
+                        layero.find('.layui-layer-btn').css('text-align', 'center');
+
+                        let data = $this.data('item');
+
+                        if (data){
+                            edit_id = data.id;
+                            $layer_content.find('.name').val(data.name);
+                        }
+
+                        console.log(data)
+
+                        form.render();
+
+                    },
+                    btn1:function () {
+
+                        let name = $layer_content.find('.name').val();
+
+                        if (name.length == 0 ){
+                            layer.msg('请完整填写');
+                            return;
+                        }
+
+                        let formData = new FormData();
+
+                        formData.append("id", edit_id);
+                        formData.append("name", name);
+
+                        $.ajax({
+                            type: "POST",
+                            url: "/system/role/save",
+                            async: true,
+                            data: formData,
+                            processData: false,
+                            contentType: false,
+                            success: function (data) {
+                                if (data.code == 1000){
+                                    layer.msg('操作成功');
+                                    window.location.reload();
+                                }else {
+                                    layer.msg(data.info);
+                                }
+                            },
+                            error: function (error) {
+
+                            },
+                        });
+
+                        layer.closeAll();
+
+                    },
+                });
+
+            });
+
+            $('.btn-delete').click(function () {
+                let $this = $(this);
+                layer.confirm('确认删除吗？', {
+                    btn: ['确认','取消'] //按钮
+                }, function(){
+
+                    let id = $this.data('item').id;
+
+                    $.ajax({
+                        url  : '/system/role/delete',
+                        data : { id:id},
+                        method : 'post',
+                        success:function (data) {
+                            if (data.code == 1000){
+                                layer.msg('操作成功');
+                                window.location.reload();
+                            }else {
+                                layer.msg(data.msg);
+                            }
+                        }
+                    });
+
+                    layer.closeAll();
+                });
+                return false;
+            });
+
+        });
+    })
+
+
+</script>
