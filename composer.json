@@ -1,6 +1,14 @@
 {
+    "name": "edv/admin-emicro",
+    "type": "project",
+    "license": "",
+    "authors": [
+        {
+            "name": "EdwinFan",
+            "email": "edwin.fan@foxmail.com"
+        }
+    ],
     "require": {
-        "ext-json": "*",
         "edv/orm": "dev-master"
     }
 }
