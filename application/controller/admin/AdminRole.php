@@ -6,10 +6,11 @@ namespace controller\admin;
 
 use annotation\ApiResponseHeader;
 use annotation\View;
+use Edv\Orm\DB;
 use EMicro\Request;
-use Illuminate\Database\Capsule\Manager;
-use model\AdminRolePermission;
-use model\AdminUserRole;
+use model\AdminRolePermissions;
+use model\AdminRoles;
+use model\AdminUserRoles;
 use util\Helper;
 use util\Response;
 
@@ -24,18 +25,18 @@ class AdminRole
      * @Route(system/roles)
      * @View(admin/roles/index)!after
      */
-    public function index(Request $request){
+    public function index(){
 
         try {
 
-            $page     = $request->input('page',1);
-            $pageSize = $request->input('page_size',config('page_size',15));
+            $page     = Request::input('page',1);
+            $pageSize = Request::input('page_size',config('page_size',15));
 
-            $roles = \model\AdminRole::query()->forPage($page,$pageSize)->get()->toArray();
+            $roles = \model\AdminRoles::query()->forPage($page, $pageSize)->select();
 
             return [
                 'list'  => $roles,
-                'count' => \model\AdminRole::query()->count()
+                'count' => \model\AdminRoles::query()->count()
             ];
 
         }catch (\Exception $exception){
@@ -48,28 +49,36 @@ class AdminRole
      * @Route(system/role/save)
      * @ApiResponseHeader()
      */
-    public function saveRole(Request $request){
+    public function saveRole(){
 
         try {
 
-            $roleName = $request->input('name');
-            $id       = $request->input('id');
+            $roleName = Request::input('name');
+            $id       = Request::input('id');
 
             if (empty($roleName))
                 throw new \Exception('role name can not empty');
 
-            if (\model\AdminRole::query()->where('name',$roleName)->first())
+            if (\model\AdminRoles::query()->getInfo([['name', '=', $roleName]]))
                 throw new \Exception('role existed');
 
+            $adminRole = \model\AdminRoles::query();
+
             if ($id > 0){
-                $adminRole = \model\AdminRole::query()->find($id);
+                $res = $adminRole->where([['id', '=', $id]])->update(
+                    [
+                        'name' => $roleName
+                    ]
+                );
             }else{
-                $adminRole = new \model\AdminRole();
+                $res = $adminRole->insert(
+                    [
+                        'name' => $roleName
+                    ]
+                );
             }
 
-            $adminRole->name = $roleName;
-
-            if (!$adminRole->save())
+            if (!$res)
                 throw new \Exception('operate failed');
 
             return Response::success();
@@ -84,31 +93,33 @@ class AdminRole
      * @Route(system/role/delete)
      * @ApiResponseHeader()
      */
-    public function deleteRole(Request $request){
+    public function deleteRole(){
 
         try {
 
-            Manager::begionTransaction();
+            DB::beginTransaction();
 
-            $id = $request->input('id');
+            $id = Request::input('id');
 
-            $role = \model\AdminRole::query()->find($id);
+            $role = \model\AdminRoles::query()->getInfo([['id', '=', $id]]);
 
             if (!$role)
                 throw new \Exception('role not exist,please fresh current page');
 
-            if (!$role->delete())
+            $res = AdminRoles::query()->where([['id', '=', $id]])->delete();
+
+            if (!$res)
                 throw new \Exception('deleted failed');
 
-            AdminUserRole::query()->where('role_id',$role->id)->delete();
+            AdminUserRoles::query()->where([['role_id', '=', $id]])->delete();
 
-            Manager::commit();
+            DB::commit();
 
             return Response::success();
 
         }catch (\Exception $exception){
 
-            Manager::callback();
+            DB::rollBack();
 
             return Response::error($exception->getMessage());
         }
@@ -119,26 +130,35 @@ class AdminRole
      * @Route(system/role/permissions)
      * @ApiResponseHeader()
      */
-    public function rolePermission(Request $request){
+    public function rolePermission(){
 
         try {
 
-            $roleId = $request->input('id');
+            $roleId = Request::input('id');
 
-            $rolePermission = AdminRolePermission::query()
-                ->where('role_id',$roleId)
-                ->pluck('permission_id')->toArray();
+            $rolePermission = AdminRolePermissions::query()
+                ->getList([['role_id','=',$roleId]]);
 
-            $curRole = AdminUserRole::query()->where('user_id',$_SESSION['user_id'])->pluck('role_id')->toArray();
+            $rolePermission = Helper::arrField($rolePermission, 'permission_id');
 
-            $query = \model\AdminPermission::query();
+            $curRole = AdminUserRoles::query()
+                ->getList([['user_id', '=', $_SESSION['user_id']]]);
 
-            if (!in_array(\model\AdminRole::ROLE_ROOT,$curRole)){
-                $curRolePermissions = AdminRolePermission::query()->whereIn('role_id',$curRole)->pluck('permission_id')->toArray();
-                $query->whereIn('id',$curRolePermissions);
+            $curRole = Helper::arrField($curRole, 'role_id');
+
+            $query = \model\AdminPermissions::query();
+
+            if (!in_array(\model\AdminRoles::ROLE_ROOT, $curRole)){
+                $curRolePermissions = AdminRolePermissions::query()
+                    ->getList('role_id','IN',$curRole);
+
+                $curRolePermissions = Helper::arrField($curRolePermissions, 'permission_id');
+
+                $query->where([['id', 'IN', $curRolePermissions]]);
+
             }
 
-            $permissions = $query->orderByRaw('pid,sort,id')->get()->toArray();
+            $permissions = $query->orderBy('pid, sort, id')->select();
 
             $returnData = [];
 
@@ -169,42 +189,51 @@ class AdminRole
      * @Route(system/role/permission/save)
      * @ApiResponseHeader()
      */
-    public function saveRolePermissions(Request $request){
+    public function saveRolePermissions(){
 
         try {
 
-            Manager::beginTransaction();
+            DB::beginTransaction();
 
-            $roleId     = $request->input('id');
-            $permission = $request->input('permission');
+            $roleId     = Request::input('id');
+            $permission = Request::input('permission');
 
             $permissionArr = explode(',',$permission);
 
-            $curPermission = AdminRolePermission::query()->where('role_id',$roleId)->pluck('permission_id')->toArray();
+            $curPermission = AdminRolePermissions::query()
+                ->getList([['role_id', '=', $roleId]]);
+
+            $curPermission = Helper::arrField($curPermission, 'permission_id');
 
             $delPermission = array_diff($curPermission,$permissionArr);
             $addPermission = array_diff($permissionArr,$curPermission);
 
-            AdminRolePermission::query()->where('role_id',$roleId)->whereIn('permission_id',$delPermission)->delete();
+            AdminRolePermissions::query()
+                ->where(
+                    [
+                        ['role_id', '=', $roleId],
+                        ['permission_id', 'IN', $delPermission]
+                    ]
+                )
+                ->delete();
 
             foreach ($addPermission as $permission){
 
-                AdminRolePermission::query()->insert(
+                AdminRolePermissions::query()->insert(
                     [
                         'role_id'       => $roleId,
                         'permission_id' => $permission
                     ]
                 );
 
-
             }
 
-
-            Manager::commit();
+            DB::commit();
 
             return Response::success();
 
         }catch (\Exception $exception){
+            DB::rollBack();
             return Response::error($exception->getMessage());
         }
 

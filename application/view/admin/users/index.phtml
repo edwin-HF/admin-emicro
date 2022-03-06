@@ -55,7 +55,7 @@
                     <?php }?>
                 </td>
                 <td>
-                    <input type="checkbox" class="btn-status" data-status="<?=$item['status']?>" <?=$item['status'] == \model\AdminUser::STATUS_NORMAL ? 'checked' : ''?> lay-skin="switch" lay-text="正常|冻结">
+                    <input type="checkbox" class="btn-status" data-status="<?=$item['status']?>" <?=$item['status'] == \model\AdminUsers::STATUS_NORMAL ? 'checked' : ''?> lay-skin="switch" lay-text="正常|冻结">
                 </td>
                 <td><?=date('Y-m-d H:i:s',strtotime($item['created_at']))??''?></td>
                 <td style="text-align: center">

@@ -4,9 +4,9 @@
 namespace util;
 
 
-use model\AdminRole;
-use model\AdminRolePermission;
-use model\AdminUserRole;
+use model\AdminRoles;
+use model\AdminRolePermissions;
+use model\AdminUserRoles;
 
 class Permission
 {
@@ -24,23 +24,36 @@ class Permission
 
         if (!self::$permission){
 
-            $roles = AdminUserRole::query()
-                ->where('user_id',$_SESSION['user_id'])
-                ->pluck('role_id')->toArray();
+            $roles = AdminUserRoles::query()
+                ->getList(
+                    [
+                        ['user_id', '=', $_SESSION['user_id']]
+                    ]
+                );
 
-            if (in_array(AdminRole::ROLE_ROOT,$roles)){
+            $roles = Helper::arrField($roles, 'role_id');
+
+            if (in_array(AdminRoles::ROLE_ROOT, $roles)){
                 $this->isRoot = true;
             }
 
-            $permissions = AdminRolePermission::query()
-                ->whereIn('role_id',$roles)
-                ->pluck('permission_id')->toArray();
+            $permissions = AdminRolePermissions::query()
+                ->getList(
+                    [
+                        ['role_id', 'IN', $roles]
+                    ]
+                );
 
-            $codes = \model\AdminPermission::query()
-                ->whereIn('id',$permissions)
-                ->pluck('code')->toArray();
+            $permissions = Helper::arrField($permissions, 'permission_id');
 
-            $this->codes = $codes;
+            $codes = \model\AdminPermissions::query()
+                ->getList(
+                    [
+                        ['id', 'IN', $permissions]
+                    ]
+                );
+
+            $this->codes = Helper::arrField($codes, 'code');
 
         }
 

@@ -6,11 +6,10 @@ namespace controller\admin;
 
 use annotation\ApiResponseHeader;
 use annotation\View;
-use EMicro\Factory;
 use EMicro\Request;
-use logic\Menu;
-use model\AdminRolePermission;
-use model\AdminUserRole;
+use model\AdminMenus;
+use model\AdminRolePermissions;
+use model\AdminUserRoles;
 use util\Helper;
 use util\Response;
 
@@ -33,7 +32,7 @@ class AdminMenu
      */
     public function menuRender(){
 
-        $menus = \model\AdminMenu::query()->orderByRaw('pid,sort,id')->get()->toArray();
+        $menus = \model\AdminMenus::query()->orderBy('pid, sort, id')->select();
 
         return Helper::list2Tree($menus,'pid',function ($item){
             return [
@@ -52,27 +51,35 @@ class AdminMenu
      * @Route(system/menus/save)
      * @ApiResponseHeader()
      */
-    public function menuSave(Request $request){
+    public function menuSave(){
 
         try {
 
-            if ($request->input('is_add')){
+            $parentId = Request::input('parent_id',0);
 
-                $menu = new \model\AdminMenu();
-                $menu->type   = 1;
-                $menu->pid    = $request->input('parent_id',0);
-                $menu->sort   = \model\AdminMenu::query()->where('pid',$request->input('parent_id',0))->max('sort') + 1;
+            $saveData['title'] = Request::input('title');
+            $saveData['icon']  = Request::input('icon');
+            $saveData['action'] = Request::input('url');
+            $saveData['code']   = Request::input('unique');
+
+            if (Request::input('is_add')){
+
+                $res = AdminMenus::query()->insert(
+                    array_merge($saveData,
+                        [
+                            'type' => 1,
+                            'pid'  => $parentId,
+                            'sort' => \model\AdminMenus::query()->where([['pid','=',$parentId]])->max('sort') + 1
+                        ]
+                    )
+                );
 
             }else{
-                $menu = \model\AdminMenu::query()->find($request->input('parent_id'));
+                $res = \model\AdminMenus::query()->where([['id','=',$parentId]])
+                    ->update($saveData);
             }
 
-            $menu->title  = $request->input('title');
-            $menu->icon   = $request->input('icon');
-            $menu->action = $request->input('url');
-            $menu->code   = $request->input('unique');
-
-            if (!$menu->save())
+            if (!$res)
                 throw new \Exception('save failed');
 
             return Response::success();
@@ -87,18 +94,18 @@ class AdminMenu
      * @Route(system/menu/delete)
      * @ApiResponseHeader()
      */
-    public function menuDelete(Request $request){
+    public function menuDelete(){
 
         try {
 
-            $id = $request->input('id');
+            $id = Request::input('id');
 
-            $menu = \model\AdminMenu::query()->find($id);
+            $menu = \model\AdminMenus::query()->getInfo([['id', '=', $id]]);
 
             if (!$menu)
                 throw new \Exception('menu not exist');
 
-            \model\AdminMenu::query()->where('id',$id)->delete();
+            \model\AdminMenus::query()->where([['id', '=', $id]])->delete();
 
             return Response::success();
 
@@ -114,26 +121,43 @@ class AdminMenu
      */
     public function menus(){
 
-        $roles = AdminUserRole::query()
-            ->where('user_id',$_SESSION['user_id'])
-            ->pluck('role_id')->toArray();
+        $roles = AdminUserRoles::query()
+            ->getList(
+                [
+                    ['user_id', '=', $_SESSION['user_id']]
+                ]
+            );
 
-        $query = \model\AdminMenu::query();
+        $roles = Helper::arrField($roles,'role_id');
 
-        if (!in_array(\model\AdminRole::ROLE_ROOT,$roles)){
+        $query = \model\AdminMenus::query();
 
-            $permissions = AdminRolePermission::query()
-                ->whereIn('role_id',$roles)
-                ->pluck('permission_id')->toArray();
+        if (!in_array(\model\AdminRoles::ROLE_ROOT, $roles)){
 
-            $codes = \model\AdminPermission::query()
-                ->whereIn('id',$permissions)
-                ->pluck('code')->toArray();
+            $permissions = AdminRolePermissions::query()->fetchSql(false)
+                ->getList(
+                    [
+                        ['role_id', 'in', $roles]
+                    ]
+                );
 
-            $query->whereIn('code',$codes);
+
+            $codes = \model\AdminPermissions::query()
+                ->getList(
+                    [
+                        ['id', 'IN', Helper::arrField($permissions,'permission_id')]
+                    ]
+                );
+
+            $query->where(
+                [
+                    ['code', 'IN', Helper::arrField($codes, 'code')]
+                ]
+            );
+
         }
 
-        $menus = $query->orderByRaw('pid,sort,id')->get()->toArray();
+        $menus = $query->orderBy('pid,sort,id')->select();
 
         return Helper::list2Tree($menus,'pid',function ($item){
             return [
@@ -152,22 +176,26 @@ class AdminMenu
      * @Route(system/menus/sort)
      * @ApiResponseHeader()
      */
-    public function menuSort(Request $request){
-
+    public function menuSort(){
 
         try {
 
-            $sort = $request->input('sort');
-            $id   = $request->input('id');
+            $sort = Request::input('sort');
+            $id   = Request::input('id');
 
-            $menu = \model\AdminMenu::query()->find($id);
+            $menu = \model\AdminMenus::query()->getInfo([['id', '=', $id]]);
 
             if (!$menu)
                 throw new \Exception('menu not exist,please fresh current page');
 
-            $menu->sort = $sort;
+            $res = AdminMenus::query()->where([['id', '=', $id]])
+                ->update(
+                    [
+                        'sort' => $sort
+                    ]
+                );
 
-            if (!$menu->save())
+            if (!$res)
                 throw new \Exception('sort failed');
 
             return Response::success();

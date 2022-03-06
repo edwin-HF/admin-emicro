@@ -5,9 +5,8 @@ namespace controller\admin;
 
 use annotation\ApiResponseHeader;
 use annotation\View;
-use EMicro\Factory;
 use EMicro\Request;
-use logic\Permission;
+use model\AdminPermissions;
 use util\Helper;
 use util\Response;
 
@@ -30,7 +29,9 @@ class AdminPermission
      */
     public function menuRender(){
 
-        $permissions = \model\AdminPermission::query()->orderByRaw('pid,sort,id')->get()->toArray();
+        $permissions = \model\AdminPermissions::query()
+            ->orderBy('pid, sort, id')
+            ->select();
 
         return Helper::list2Tree($permissions,'pid',function ($item){
             return [
@@ -47,26 +48,31 @@ class AdminPermission
      * @Route(system/permission/save)
      * @ApiResponseHeader()
      */
-    public function menuSave(Request $request){
+    public function menuSave(){
 
         try {
 
-            if ($request->input('is_add')){
+            $parentId = Request::input('parent_id',0);
 
-                $permission = new \model\AdminPermission();
-                $permission->type   = 1;
-                $permission->pid    = $request->input('parent_id',0);
-                $permission->sort   = \model\AdminPermission::query()->where('pid',$request->input('parent_id',0))->max('sort') + 1;
+            $saveData['title'] = Request::input('title');
+            $saveData['code']  = Request::input('unique');
+            $saveData['type']  = Request::input('type');
+
+            if (Request::input('is_add')){
+
+                $res = AdminPermissions::query()->insert(
+                    array_merge($saveData,[
+                        'type' => 1,
+                        'pid'  => $parentId,
+                        'sort' => AdminPermissions::query()->where([['pid', '=', $parentId]])->max('sort') + 1
+                    ])
+                );
 
             }else{
-                $permission = \model\AdminPermission::query()->find($request->input('parent_id'));
+                $res = AdminPermissions::query()->where([['id', '=', $parentId]])->update($saveData);
             }
 
-            $permission->title = $request->input('title');
-            $permission->code  = $request->input('unique');
-            $permission->type  = $request->input('type');
-
-            if (!$permission->save())
+            if (!$res)
                 throw new \Exception('save failed');
 
             return Response::success();
@@ -81,18 +87,18 @@ class AdminPermission
      * @Route(system/permission/delete)
      * @ApiResponseHeader()
      */
-    public function permissionDelete(Request $request){
+    public function permissionDelete(){
 
         try {
 
-            $id = $request->input('id');
+            $id = Request::input('id');
 
-            $menu = \model\AdminPermission::query()->find($id);
+            $menu = \model\AdminPermissions::query()->getInfo([['id', '=', $id]]);
 
             if (!$menu)
                 throw new \Exception('menu not exist');
 
-            \model\AdminPermission::query()->where('id',$id)->delete();
+            \model\AdminPermissions::query()->where([['id', '=', $id]])->delete();
 
             return Response::success();
 
@@ -106,21 +112,25 @@ class AdminPermission
      * @Route(system/permissions/sort)
      * @ApiResponseHeader()
      */
-    public function permissionsSort(Request $request){
+    public function permissionsSort(){
 
         try {
 
-            $sort = $request->input('sort');
-            $id   = $request->input('id');
+            $sort = Request::input('sort');
+            $id   = Request::input('id');
 
-            $permission = \model\AdminPermission::query()->find($id);
+            $permission = \model\AdminPermissions::query()->getInfo([['id', '=', $id]]);
 
             if (!$permission)
                 throw new \Exception('permission not exist,please fresh current page');
 
-            $permission->sort = $sort;
+            $res = AdminPermissions::query()->where([['id', '=', $id]])->update(
+                [
+                    'sort' => $sort
+                ]
+            );
 
-            if (!$permission->save())
+            if (!$res)
                 throw new \Exception('sort failed');
 
             return Response::success();

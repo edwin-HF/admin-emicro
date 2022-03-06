@@ -1,6 +1,6 @@
 {
     "require": {
-        "illuminate/database": "^8.65",
-        "ext-json": "*"
+        "ext-json": "*",
+        "edv/orm": "dev-master"
     }
 }

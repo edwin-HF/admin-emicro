@@ -6,11 +6,11 @@ namespace controller\admin;
 
 use annotation\ApiResponseHeader;
 use annotation\View;
+use Edv\Orm\DB;
 use EMicro\Request;
-use Illuminate\Database\Capsule\Manager;
-use Illuminate\Support\Str;
-use model\AdminRolePermission;
-use model\AdminUserRole;
+use model\AdminRolePermissions;
+use model\AdminUserRoles;
+use model\AdminUsers;
 use util\Helper;
 use util\Response;
 
@@ -31,26 +31,30 @@ class AdminUser
     /**
      * @ApiResponseHeader()
      */
-    public function attempt(Request $request){
+    public function attempt(){
 
         try {
 
-            $username = $request->input('username','');
-            $password = $request->input('password','');
+            $username = Request::input('username','');
+            $password = Request::input('password','');
 
             if (empty($username) || empty($password))
                 throw new \Exception('请输入用户名和密码');
 
-            $user = \model\AdminUser::query()->where('username', $username)->first();
+            $user = \model\AdminUsers::query()->getInfo(
+                [
+                    ['username', '=', $username]
+                ]
+            );
 
             if (!$user)
                 throw new \Exception('用户不存在');
 
-            if ($user->password != Helper::password($password,$user->salt))
+            if ($user['password'] != Helper::password($password, $user['salt']))
                 throw new \Exception('密码错误');
 
-            $_SESSION['username'] = $user->username;
-            $_SESSION['user_id']  = $user->id;
+            $_SESSION['username'] = $user['username'];
+            $_SESSION['user_id']  = $user['id'];
 
             return Response::success();
 
@@ -63,17 +67,21 @@ class AdminUser
     /**
      * @ApiResponseHeader()
      */
-    public function changePassword(Request $request){
+    public function changePassword(){
 
         try {
 
-            $oldPassword = $request->input('old_password','');
-            $newPassword = $request->input('new_password','');
+            $oldPassword = Request::input('old_password','');
+            $newPassword = Request::input('new_password','');
 
             if (empty($oldPassword) || empty($newPassword))
                 throw new \Exception('密码不能为空');
 
-            $user = \model\AdminUser::query()->find($_SESSION['user_id']);
+            $user = \model\AdminUsers::query()->getInfo(
+                [
+                    ['id', '=', $_SESSION['user_id']]
+                ]
+            );
 
             if (!$user)
                 throw new \Exception('user not found');
@@ -81,7 +89,7 @@ class AdminUser
             if ($user->password != Helper::password($oldPassword,$user->salt))
                 throw new \Exception('old password err');
 
-            $salt = Str::random(4);
+            $salt = Helper::random(4);
 
             $user->password = Helper::password($newPassword,$salt);
             $user->salt     = $salt;
@@ -108,28 +116,36 @@ class AdminUser
      * @Route(system/users)
      * @View(admin/users/index)!after
      */
-    public function userList(Request $request){
+    public function userList(){
 
         try {
 
-            $page = $request->input('page',1);
-            $pageSize = $request->input('page_size',config('system.page_size',15));
+            $page = Request::input('page',1);
+            $pageSize = Request::input('page_size',config('system.page_size',15));
 
-            $users = \model\AdminUser::query()
+            $users = \model\AdminUsers::query()
                 ->forPage($page,$pageSize)
-                ->get();
+                ->select();
 
-            $userRole = AdminUserRole::query()
-                ->select('admin_user_roles.*','admin_roles.name')
-                ->leftJoin('admin_roles','admin_user_roles.role_id','=','admin_roles.id')
-                ->whereIn('user_id',$users->pluck('id'))
-                ->get()->toArray();
+            $userRole = AdminUserRoles::query()
+                ->getList(
+                    [
+                        ['user_id', 'IN', Helper::arrField($users, 'id')]
+                    ],
+                    'ur.*, r.name',
+                    [
+                        'alias'  => 'ur',
+                        'relate' => [
+                            ['admin_roles r', 'ur.role_id = r.id']
+                        ]
+                    ]
+                );
 
             return [
-                'list'      => $users->toArray(),
-                'count'     => \model\AdminUser::query()->count(),
+                'list'      => $users,
+                'count'     => \model\AdminUsers::query()->count(),
                 'roleGroup' => Helper::arrMapGroup($userRole,'user_id'),
-                'roles'     => Helper::arrMap(\model\AdminRole::query()->get()->toArray(),'id')
+                'roles'     => Helper::arrMap(\model\AdminRoles::query()->getList(), 'id')
             ];
 
         }catch (\Exception $exception){
@@ -142,57 +158,56 @@ class AdminUser
      * @Route(system/user/save)
      * @ApiResponseHeader()
      */
-    public function saveUser(Request $request){
+    public function saveUser(){
 
         try {
 
-            Manager::beginTransaction();
+            DB::beginTransaction();
 
-            $id       = $request->input('id');
-            $username = $request->input('username');
-            $password = $request->input('password');
-            $status   = $request->input('status');
-            $roles    = $request->input('roles');
+            $id       = Request::input('id');
+            $username = Request::input('username');
+            $password = Request::input('password');
+            $status   = Request::input('status');
+            $roles    = Request::input('roles');
 
-            if ($id > 0){
-                $user = \model\AdminUser::query()->find($id);
-            }else{
-                $user = new \model\AdminUser();
-            }
 
             if (!empty($password)){
-                $salt = Str::random(4);
-                $user->salt = $salt;
-                $user->password = Helper::password($password,$salt);
+                $salt = Helper::random(4);
+                $saveData['salt']     = $salt;
+                $saveData['password'] = Helper::password($password, $salt);
             }
 
-            $user->username = $username;
-            $user->status   = $status;
+            $saveData['username'] = $username;
+            $saveData['status']   = $status;
 
-            if (!$user->save())
-                throw new \Exception('user saved err');
+            if ($id > 0){
+                $userId = $id;
+                \model\AdminUsers::query()->where([['id', '=', $id]])->update($saveData);
+            }else{
+                $userId = AdminUsers::query()->insert($saveData);
+            }
 
-            AdminUserRole::query()->where('user_id',$user->id)->delete();
+            AdminUserRoles::query()->where([['user_id', '=', $userId]])->delete();
 
             $roleArr = explode(',',$roles);
 
             foreach ($roleArr as $role) {
 
-                AdminUserRole::query()->insert(
+                AdminUserRoles::query()->insert(
                     [
-                        'user_id' => $user->id,
+                        'user_id' => $userId,
                         'role_id' => $role
                     ]
                 );
 
             }
 
-            Manager::commit();
+            DB::commit();
 
             return Response::success();
 
         }catch (\Exception $exception){
-            Manager::rollback();
+            DB::rollBack();
             return Response::error($exception->getMessage());
         }
 
@@ -202,29 +217,29 @@ class AdminUser
      * @Route(system/user/delete)
      * @ApiResponseHeader()
      */
-    public function userDelete(Request $request){
+    public function userDelete(){
 
         try {
 
-            Manager::beginTransaction();
+            DB::beginTransaction();
 
-            $id = $request->input('id');
+            $id = Request::input('id');
 
-            $user = \model\AdminUser::query()->find($id);
+            $user = \model\AdminUsers::query()->getInfo([['id', '=', $id]]);
 
             if (!$user)
                 throw new \Exception('user not found,please fresh current page');
 
-            $user->delete();
+            AdminUsers::query()->where([['id', '=', $id]])->delete();
 
-            AdminUserRole::query()->where('user_id',$user->id)->delete();
+            AdminUserRoles::query()->where([['user_id', '=', $id]])->delete();
 
-            Manager::commit();
+            DB::commit();
 
             return Response::success();
 
         }catch (\Exception $exception){
-            Manager::rollback();
+            DB::rollBack();
 
             return Response::error($exception->getMessage());
         }
@@ -239,22 +254,30 @@ class AdminUser
 
         try {
 
-            $roles = AdminUserRole::query()
-                ->where('user_id',$_SESSION['user_id'])
-                ->pluck('role_id')->toArray();
+            $roles = AdminUserRoles::query()->getList(
+                [
+                    ['user_id', '=', $_SESSION['user_id']]
+                ]
+            );
 
-            $permissions = AdminRolePermission::query()
-                ->whereIn('role_id',$roles)
-                ->pluck('permission_id')->toArray();
+            $roles = Helper::arrField($roles, 'role_id');
 
-            $codes = \model\AdminPermission::query()
-                ->whereIn('id',$permissions)
-                ->pluck('code')->toArray();
+            $permissions = AdminRolePermissions::query()->getList(
+                [
+                    ['role_id', 'IN', $roles]
+                ]
+            );
+
+            $codes = \model\AdminPermissions::query()->getList(
+                [
+                    ['id', 'IN', Helper::arrField($permissions,'permission_id')]
+                ]
+            );
 
             return Response::success(
                 [
-                    'is_root' => (in_array(\model\AdminRole::ROLE_ROOT,$roles) ? 1 : 0),
-                    'permissions' => $codes
+                    'is_root' => (in_array(\model\AdminRoles::ROLE_ROOT, $roles) ? 1 : 0),
+                    'permissions' => Helper::arrField($codes, 'code')
                 ]
             );
 

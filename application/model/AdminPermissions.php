@@ -4,9 +4,9 @@
 namespace model;
 
 
-use Illuminate\Database\Eloquent\Model;
+use Edv\Orm\Model;
 
-class AdminPermission extends Model
+class AdminPermissions extends Model
 {
 
     public const TYPE_MENU   = 1;

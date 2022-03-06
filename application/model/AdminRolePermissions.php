@@ -4,9 +4,9 @@
 namespace model;
 
 
-use Illuminate\Database\Eloquent\Model;
+use Edv\Orm\Model;
 
-class AdminUserRole extends Model
+class AdminRolePermissions extends Model
 {
 
     protected $created_at='';

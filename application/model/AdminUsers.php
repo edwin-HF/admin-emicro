@@ -4,7 +4,9 @@
 namespace model;
 
 
-class AdminUser extends \Illuminate\Database\Eloquent\Model
+use Edv\Orm\Model;
+
+class AdminUsers extends Model
 {
 
     public const STATUS_NORMAL = 1;
