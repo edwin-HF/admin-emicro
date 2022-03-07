@@ -129,9 +129,7 @@ class AdminUser
 
             $userRole = AdminUserRoles::query()
                 ->getList(
-                    [
-                        ['user_id', 'IN', Helper::arrField($users, 'id')]
-                    ],
+                    [],
                     'ur.*, r.name',
                     [
                         'alias'  => 'ur',
