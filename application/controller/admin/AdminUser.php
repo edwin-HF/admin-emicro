@@ -86,15 +86,19 @@ class AdminUser
             if (!$user)
                 throw new \Exception('user not found');
 
-            if ($user->password != Helper::password($oldPassword,$user->salt))
+            if ($user['password'] != Helper::password($oldPassword,$user['salt']))
                 throw new \Exception('old password err');
 
             $salt = Helper::random(4);
 
-            $user->password = Helper::password($newPassword,$salt);
-            $user->salt     = $salt;
+            $res = AdminUsers::query()->where([['id', '=', $user['id']]])->update(
+                [
+                    'password' => Helper::password($newPassword, $salt),
+                    'salt'     => $salt
+                ]
+            );
 
-            if (!$user->save())
+            if (!$res)
                 throw new \Exception('change err');
 
             return Response::success();
