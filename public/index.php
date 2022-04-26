@@ -2,12 +2,19 @@
 
 
 use EMicro\Application;
+use EMicro\Config;
+use EMicro\Loader;
 
 session_start();
 
 require_once "../vendor/autoload.php";
 
-$application = Application::getInstance();
+define("APP_PATH", dirname(__DIR__).'/application');
+define("CONFIG_PATH", APP_PATH.'/config');
+
+Loader::scan(APP_PATH);
+Config::scan(CONFIG_PATH);
+Application::scan(APP_PATH);
 
 $handle = ($_SERVER['REQUEST_URI'] == '/' ? '/login' : $_SERVER['REQUEST_URI']);
 
@@ -19,7 +26,7 @@ if ($_SERVER['REQUEST_URI'] == '/' && isset($_SESSION['username'])){
     $handle = '/index';
 }
 
-$application->run($handle);
+Application::run($_SERVER['REQUEST_URI']);
 
 
 
