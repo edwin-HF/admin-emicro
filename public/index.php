@@ -26,7 +26,7 @@ if ($_SERVER['REQUEST_URI'] == '/' && isset($_SESSION['username'])){
     $handle = '/index';
 }
 
-Application::run($_SERVER['REQUEST_URI']);
+Application::run($handle);
 
 
 
